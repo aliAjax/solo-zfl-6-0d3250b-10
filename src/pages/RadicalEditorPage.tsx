@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Save, Trash2, RefreshCw, Pen, Square, Circle, Eraser, Plus, X } from 'lucide-react';
+import { Save, Trash2, RefreshCw, Pen, Square, Circle, Eraser, X } from 'lucide-react';
 import { useWritingSystemStore } from '@/store/useWritingSystemStore';
 import { ShapeRenderer } from '@/components/GlyphRenderer';
 import { CATEGORY_OPTIONS } from '@/utils/glyphUtils';
-import type { Radical, GlyphVariant, RadicalCategory } from '@/types';
+import type { GlyphVariant, RadicalCategory } from '@/types';
 
 type Tool = 'pen' | 'rect' | 'circle' | 'eraser';
 
@@ -188,7 +188,7 @@ export const RadicalEditorPage: React.FC = () => {
       meaning: meaning.trim(),
       pronunciation: pronunciation.trim() || name.trim(),
       category,
-      baseShape: currentBasePath || generateDefaultShape(name.trim()),
+      baseShape: currentBasePath || generateDefaultShape(),
       variants,
     };
 
@@ -507,6 +507,6 @@ const ToolBtn: React.FC<{
   </button>
 );
 
-function generateDefaultShape(_char: string): string {
+function generateDefaultShape(): string {
   return `M30 30 C50 20 70 20 70 50 C70 70 50 80 30 70 C20 60 20 40 30 30 Z`;
 }

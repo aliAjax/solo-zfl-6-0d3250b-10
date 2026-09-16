@@ -1,7 +1,9 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Grid3X3, Clock, PenTool, Combine, BookOpenText, Download, Upload, RotateCcw } from 'lucide-react';
+import { Grid3X3, Clock, PenTool, Combine, BookOpenText, GraduationCap, Download, Upload, RotateCcw } from 'lucide-react';
 import { useWritingSystemStore } from '@/store/useWritingSystemStore';
+import { usePracticeStore } from '@/practice/store';
+import { exportBackup, importBackup } from '@/services/backup';
 
 const NavItem: React.FC<{ to: string; icon: React.ReactNode; label: string }> = ({ to, icon, label }) => (
   <NavLink
@@ -23,17 +25,15 @@ const NavItem: React.FC<{ to: string; icon: React.ReactNode; label: string }> = 
 
 export const Header: React.FC = () => {
   const navigate = useNavigate();
-  const exportData = useWritingSystemStore((s) => s.exportData);
-  const importData = useWritingSystemStore((s) => s.importData);
   const resetAll = useWritingSystemStore((s) => s.resetAll);
 
   const handleExport = () => {
-    const json = exportData();
+    const { filename, json } = exportBackup();
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `writing-system-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -48,10 +48,14 @@ export const Header: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
-          importData(ev.target?.result as string);
-          alert('导入成功！');
-        } catch {
-          alert('导入失败：文件格式不正确');
+          const report = importBackup(ev.target?.result as string);
+          alert(
+            report.practiceImported
+              ? '导入成功：字根词条与练习记录均已恢复。'
+              : `导入成功：字根词条已恢复。\n${report.practiceSkippedReason ?? ''}`
+          );
+        } catch (err) {
+          alert(`导入失败：${err instanceof Error ? err.message : '文件格式不正确'}\n原有数据未改动。`);
         }
       };
       reader.readAsText(file);
@@ -60,8 +64,9 @@ export const Header: React.FC = () => {
   };
 
   const handleReset = () => {
-    if (confirm('确定要重置所有数据吗？此操作无法撤销。')) {
+    if (confirm('确定要重置所有数据吗？字根、词条与练习记录都会恢复初始，此操作无法撤销。')) {
       resetAll();
+      usePracticeStore.getState().resetPractice();
       navigate('/glyphs');
     }
   };
@@ -91,6 +96,7 @@ export const Header: React.FC = () => {
           <NavItem to="/editor/radical" icon={<PenTool size={18} />} label="字根编辑" />
           <NavItem to="/composer" icon={<Combine size={18} />} label="字根组合" />
           <NavItem to="/lexicon" icon={<BookOpenText size={18} />} label="词条库" />
+          <NavItem to="/practice" icon={<GraduationCap size={18} />} label="练习台" />
         </nav>
 
         <div className="flex items-center gap-2">

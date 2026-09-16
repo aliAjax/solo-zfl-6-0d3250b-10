@@ -60,4 +60,17 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  .mini-btn {
+    @apply flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-kai
+      text-ink-400 hover:text-ink-500 bg-parchment-50 border border-parchment-300/60
+      hover:border-bronze-300 transition-all duration-200 shadow-scroll;
+  }
+
+  .mini-btn-danger {
+    @apply flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-kai
+      text-vermilion-500/80 hover:text-vermilion-500 bg-parchment-50
+      border border-vermilion-500/25 hover:border-vermilion-500/50
+      hover:bg-vermilion-500/5 transition-all duration-200;
+  }
 }

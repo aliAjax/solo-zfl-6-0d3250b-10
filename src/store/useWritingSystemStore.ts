@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { WritingSystemStore, Radical, Lexeme, CompositionLayout } from '@/types';
 import { generateId } from '@/utils/glyphUtils';
 import { MOCK_STAGES, MOCK_RADICALS, MOCK_LEXEMES } from '@/utils/mockData';
+import { validateMain } from '@/services/validateMain';
 
 const STORAGE_KEY = 'fictional-writing-system-v1';
 
@@ -141,15 +142,16 @@ export const useWritingSystemStore = create<WritingSystemStore>()(
       importData: (json) => {
         try {
           const parsed = JSON.parse(json);
-          if (!parsed.stages || !parsed.radicals || !parsed.lexemes) {
-            throw new Error('Invalid data format');
-          }
+          // 先校验，通过后才落库：坏文件不会覆盖原有字根与词条
+          const { stages, radicals, lexemes } = validateMain(parsed);
           set({
-            stages: parsed.stages,
-            radicals: parsed.radicals,
-            lexemes: parsed.lexemes,
+            stages: stages as typeof parsed.stages,
+            radicals: radicals as typeof parsed.radicals,
+            lexemes: lexemes as typeof parsed.lexemes,
             selectedRadicalId: null,
-            selectedStageId: parsed.stages[parsed.stages.length - 1]?.id || null,
+            selectedStageId:
+              (Array.isArray(stages) ? (stages[stages.length - 1] as { id?: string } | undefined)?.id : null) ||
+              null,
             composingRadicalIds: [],
           });
         } catch (e) {

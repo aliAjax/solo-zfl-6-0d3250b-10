@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowRight, Save, RotateCcw, GripVertical, ArrowLeftRight, ArrowUpDown, Boxes, Layers, Sparkles, X } from 'lucide-react';
 import { useWritingSystemStore } from '@/store/useWritingSystemStore';
-import { GlyphRenderer, ShapeRenderer } from '@/components/GlyphRenderer';
+import { GlyphRenderer } from '@/components/GlyphRenderer';
 import { LAYOUT_LABELS, computeCompositionTransforms, getRadicalShapeForStage } from '@/utils/glyphUtils';
 import type { CompositionLayout } from '@/types';
 
@@ -14,7 +14,6 @@ const LAYOUT_OPTIONS: { key: CompositionLayout; icon: React.ReactNode; label: st
 
 export const ComposerPage: React.FC = () => {
   const radicals = useWritingSystemStore((s) => s.radicals);
-  const stages = useWritingSystemStore((s) => s.stages);
   const selectedStageId = useWritingSystemStore((s) => s.selectedStageId);
   const composingRadicalIds = useWritingSystemStore((s) => s.composingRadicalIds);
   const composingLayout = useWritingSystemStore((s) => s.composingLayout);
