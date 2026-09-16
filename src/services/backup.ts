@@ -66,7 +66,7 @@ export const importBackup = (json: string, now: number = Date.now()): ImportRepo
 
   const report: ImportReport = { mainImported: true, practiceImported: false };
   if (cleanPractice) {
-    usePracticeStore.setState({ data: cleanPractice });
+    usePracticeStore.getState().loadPracticeData(cleanPractice);
     report.practiceImported = true;
   } else {
     report.practiceSkippedReason = '该备份为旧版格式，不含练习记录；当前练习进度已保留。';

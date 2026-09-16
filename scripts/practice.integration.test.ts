@@ -163,5 +163,40 @@ test('练习段损坏不影响主数据导入策略：坏练习段会 throw', ()
   assert.throws(() => importBackup(bundle), /版本/);
 });
 
+console.log('\n[C] 导入练习数据后首答不被当成重复（回归）');
+
+test('历史题号高于计数器：导入后新题 id 高于历史，首答正常计分', () => {
+  // 构造一份「questionSeq 落后、但历史里已有 q-50」的练习数据
+  const stale = JSON.stringify({
+    version: 1,
+    mastery: { 'radical:rad-sun': { key: 'radical:rad-sun', targetType: 'radical', targetId: 'rad-sun', mastery: 50, streak: 1, total: 1, correct: 1, wrongBook: false, lastWrongAt: null, lastAnsweredAt: 1, dueAt: 1, lastClock: 1 } },
+    wrongBookKeys: [],
+    history: [
+      { questionId: 'q-50', targetType: 'radical', targetId: 'rad-sun', type: 'radical-meaning-glyph', correct: true, at: 1, masteryBefore: 38, masteryAfter: 50 },
+    ],
+    clockHighWater: 1,
+    questionSeq: 2,
+  });
+  const epochBefore = usePracticeStore.getState().dataEpoch;
+  usePracticeStore.getState().importPractice(stale, 5_000);
+  assert.equal(usePracticeStore.getState().dataEpoch, epochBefore + 1, '导入应自增 dataEpoch');
+  assert.ok(usePracticeStore.getState().data.questionSeq >= 50, '计数器被历史题号顶上去');
+
+  // 导入后出的第一道题，作答必须计分（不是重复提交）
+  const q = usePracticeStore.getState().issueQuestion(src(), 'radical', MOCK_RADICALS[1].id).question!;
+  assert.ok(!usePracticeStore.getState().data.history.some((h) => h.questionId === q.id), '新题 id 不应撞历史');
+  const histLen = usePracticeStore.getState().data.history.length;
+  const res = usePracticeStore.getState().submitAnswer(q, q.answerIndex, 6_000);
+  assert.equal(res.duplicate, false, '导入后首答不得被判重复');
+  assert.equal(usePracticeStore.getState().data.history.length, histLen + 1, '流水增加一条');
+});
+
+test('loadPracticeData（整包导入走的路径）也会自增 epoch', () => {
+  const before = usePracticeStore.getState().dataEpoch;
+  const clean = { ...usePracticeStore.getState().data };
+  usePracticeStore.getState().loadPracticeData(clean);
+  assert.equal(usePracticeStore.getState().dataEpoch, before + 1);
+});
+
 console.log(`\n结果：${passed} 通过，${failed} 失败\n`);
 if (failed > 0) process.exit(1);

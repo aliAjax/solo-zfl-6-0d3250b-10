@@ -42,9 +42,11 @@ export interface QuizQuestion {
   prompt: string;
   /** 渲染题干所需信息（字根字图形 / 词条复合字图形 / 文本） */
   stem:
-    | { kind: 'radical'; radicalId: string }
-    | { kind: 'lexeme'; radicalIds: string[]; layout: string }
+    | { kind: 'radical'; radicalId: string; hint?: string }
+    | { kind: 'lexeme'; radicalIds: string[]; layout: string; hint?: string }
     | { kind: 'text'; text: string };
+  /** 同形消歧锚点等补充说明（如「该字读 x」），渲染在题干图形下方 */
+  hint?: string;
   /** 选项（已按确定性 RNG 洗牌，answerIndex 处为唯一正确项） */
   options: QuizOption[];
   answerIndex: number;

@@ -150,6 +150,44 @@ await test('结束本组回到开始面板，且题库诊断仍在', async () =>
   assert.ok(byText(container, 'button', '开始一组练习'));
 });
 
+await test('导入练习数据后：正在作答的题立即作废，且导入后首答正常计分', async () => {
+  const container = document.getElementById('root')!;
+  // 回到练习页并开一道题
+  await click(byText(container, 'button', '开始一组练习')!);
+  assert.ok(container.querySelector('[data-testid="quiz-option-0"]'), '应出现待答题');
+
+  // 导入一份「历史题号 q-50 高于计数器」的数据
+  const stale = JSON.stringify({
+    version: 1,
+    mastery: {},
+    wrongBookKeys: [],
+    history: [
+      { questionId: 'q-50', targetType: 'radical', targetId: 'rad-sun', type: 'radical-meaning-glyph', correct: true, at: 1, masteryBefore: 38, masteryAfter: 50 },
+    ],
+    clockHighWater: 1,
+    questionSeq: 2,
+  });
+  await act(async () => {
+    usePracticeStore.getState().importPractice(stale, Date.now());
+  });
+  // 当前题被作废，回到开始面板（不会拿旧 q-N 去提交撞 q-50）
+  assert.ok(!container.querySelector('[data-testid="quiz-option-0"]'), '导入后当前题必须作废');
+  assert.ok(byText(container, 'button', '开始一组练习'));
+
+  // 再开始：第一题作答必须计分，不是重复
+  await click(byText(container, 'button', '开始一组练习')!);
+  const opt0 = container.querySelector('[data-testid="quiz-option-0"]') as HTMLButtonElement;
+  assert.ok(opt0);
+  const histBefore = usePracticeStore.getState().data.history.length;
+  await click(opt0);
+  const body = container.querySelector('[data-testid="quiz-judgement"]')?.textContent ?? '';
+  assert.ok(body.includes('答对了') || body.includes('答错了'));
+  assert.equal(usePracticeStore.getState().data.history.length, histBefore + 1, '导入后首答必须计分一次');
+  // 该题 id 不应是历史里的 q-50
+  const lastId = usePracticeStore.getState().data.history.at(-1)!.questionId;
+  assert.notEqual(lastId, 'q-50');
+});
+
 // 卸载组件，清掉页面内的 5 秒定时器
 if (mountedRoot) {
   await act(async () => {

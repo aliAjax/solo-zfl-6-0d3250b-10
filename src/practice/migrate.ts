@@ -74,7 +74,14 @@ export const sanitizePractice = (raw: unknown, now: number): PracticeData => {
     ? Array.from(new Set(obj.wrongBookKeys.map(String).filter((k) => mastery[k]?.wrongBook)))
     : Object.values(mastery).filter((r) => r.wrongBook).map((r) => r.key);
 
-  const seq = Math.max(0, Math.floor(Number(obj.questionSeq) || 0));
+  // 题 id 序号必须严格高于历史里出现过的任何题号，
+  // 否则导入一份 questionSeq 落后、但历史里已有 q-9 的数据后，新题会复用 q-9，
+  // 首答即被当成重复提交而不计分。
+  let maxHistorySeq = Math.max(0, Math.floor(Number(obj.questionSeq) || 0));
+  for (const h of history) {
+    const m = /^q-(\d+)$/.exec(h.questionId);
+    if (m) maxHistorySeq = Math.max(maxHistorySeq, Number(m[1]));
+  }
 
   return {
     version: DATA_VERSION,
@@ -82,6 +89,6 @@ export const sanitizePractice = (raw: unknown, now: number): PracticeData => {
     wrongBookKeys,
     history,
     clockHighWater: now,
-    questionSeq: seq,
+    questionSeq: maxHistorySeq,
   };
 };

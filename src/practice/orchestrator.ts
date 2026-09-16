@@ -86,7 +86,7 @@ export const nextQuestion = (args: NextArgs): NextResult => {
 
   // 3) 这一轮见过的对象都练过、但库里还有未到期对象
   let reason: string;
-  if (avail.totalQuestions === 0) {
+  if (!avail.anyQuestion) {
     reason = avail.reasons.join('\n') || '暂无可出之题。';
   } else {
     reason = '本批次暂无可练内容：到期的题都已答完，未到期的题还在间隔休息中。稍后再来，错题会最早出现。';

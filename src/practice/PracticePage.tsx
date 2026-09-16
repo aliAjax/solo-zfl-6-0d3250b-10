@@ -14,7 +14,7 @@ import {
   Clock3,
 } from 'lucide-react';
 import { useWritingSystemStore } from '@/store/useWritingSystemStore';
-import { usePracticeStore } from '@/practice/store';
+import { usePracticeStore, nextQuestionSeq } from '@/practice/store';
 import { inspectAvailability, TYPE_LABELS } from '@/practice/engine';
 import { nextQuestion } from '@/practice/orchestrator';
 import { masteryKey, WRONG_RETRY_INTERVAL } from '@/practice/scheduler';
@@ -61,6 +61,7 @@ export const PracticePage: React.FC = () => {
   const radicals = useWritingSystemStore((s) => s.radicals);
   const lexemes = useWritingSystemStore((s) => s.lexemes);
   const practice = usePracticeStore((s) => s.data);
+  const dataEpoch = usePracticeStore((s) => s.dataEpoch);
   const issueQuestion = usePracticeStore((s) => s.issueQuestion);
   const submitAnswer = usePracticeStore((s) => s.submitAnswer);
   const resetPractice = usePracticeStore((s) => s.resetPractice);
@@ -84,9 +85,20 @@ export const PracticePage: React.FC = () => {
   }, []);
   void tick;
 
+  // 练习数据集被替换（导入 / 重置）后，正在作答的旧题属于历史数据，立即作废，
+  // 避免拿历史题号提交而被判成「重复提交不计分」
+  useEffect(() => {
+    if (dataEpoch > 0) {
+      setQuestion(null);
+      setJudgement(null);
+      setEmptyReason(null);
+      roundSeen.current = [];
+    }
+  }, [dataEpoch]);
+
   const drawNext = useCallback(() => {
     // 直接从引擎取「下一个对象」，再由 store 分配全局唯一题号
-    const seq = usePracticeStore.getState().data.questionSeq + 1;
+    const seq = nextQuestionSeq(usePracticeStore.getState().data);
     const plan = nextQuestion({
       src,
       data: usePracticeStore.getState().data,
@@ -287,41 +299,44 @@ export const PracticePage: React.FC = () => {
         <div className="animate-fade-up">
           {!question && !judgement && (
             <div className="bg-parchment-50 rounded-2xl p-12 shadow-scroll border border-parchment-300/40 text-center">
-              {availability.totalQuestions === 0 && (radicals.length === 0 && lexemes.length === 0) ? (
+              {radicals.length === 0 && lexemes.length === 0 && (
                 <>
                   <div className="text-6xl mb-4 opacity-30">📭</div>
                   <p className="font-kai text-2xl text-ink-300 mb-2">字库是空的，还无法出题</p>
                 </>
-              ) : null}
+              )}
               <p className="font-song text-ink-500 whitespace-pre-line leading-relaxed mb-6">
                 {emptyReason ?? '准备好了就开始：优先复习到期内容，错题最先出现；之后学习新的字根与词条。'}
               </p>
 
               {/* 题型可用性 */}
               <div className="max-w-2xl mx-auto mb-8 text-left">
-                <p className="font-kai text-sm text-ink-300 mb-2">题库情况（每种题型需至少 4 个可区分候选）：</p>
+                <p className="font-kai text-sm text-ink-300 mb-2">题库情况（可考对象 + 是否凑得齐 4 选 1）：</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {(Object.keys(TYPE_LABELS) as Array<keyof typeof TYPE_LABELS>).map((t) => {
-                    const n = availability.pools[t];
-                    const ok = n >= 4;
+                    const n = availability.askable[t];
+                    const ready = availability.supplyReady[t] && n > 0;
                     return (
                       <div
                         key={t}
+                        title={n === 0 ? '对象缺字段或同形同音不可区分' : ready ? '' : '可考对象有，但可区分候选项不足 4 个'}
                         className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm font-song ${
-                          ok
+                          ready
                             ? 'bg-bronze-400/10 border-bronze-300/40 text-bronze-600'
                             : 'bg-parchment-100/60 border-parchment-300/50 text-ink-200'
                         }`}
                       >
                         <span className="font-kai">{TYPE_LABELS[t]}</span>
-                        <span className="text-xs">{ok ? `可出题（${n}）` : `候选不足（${n}）`}</span>
+                        <span className="text-xs">
+                          {n === 0 ? '暂无可考对象' : ready ? `可出题（${n} 个可考）` : `候选不足（${n} 个可考）`}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              {nextDuePreview !== null && !emptyReason?.startsWith('字库') && (
+              {nextDuePreview !== null && (
                 <p className="font-song text-xs text-ink-200 mb-4 flex items-center justify-center gap-1">
                   <Clock3 size={13} /> 下一道复习题：{relTime(nextDuePreview - nowMs)}
                 </p>
@@ -329,10 +344,10 @@ export const PracticePage: React.FC = () => {
 
               <button
                 onClick={startSession}
-                disabled={availability.totalQuestions === 0}
+                disabled={!availability.anyQuestion}
                 className="px-8 py-3 bg-vermilion-500 hover:bg-vermilion-600 disabled:bg-ink-200 disabled:cursor-not-allowed text-parchment-50 rounded-xl font-kai text-lg shadow-seal transition-all hover:scale-105 active:scale-95"
               >
-                {availability.totalQuestions === 0 ? '数据不足，无法练习' : '开始一组练习'}
+                {availability.anyQuestion ? '开始一组练习' : '数据不足，无法练习'}
               </button>
             </div>
           )}
@@ -555,7 +570,7 @@ const QuestionCard: React.FC<{
         <p className="font-kai text-xl text-ink-500 mb-6 text-center">{question.prompt}</p>
 
         {/* 题干 */}
-        <div className="flex justify-center mb-8">
+        <div className="flex flex-col items-center mb-8">
           <div className="w-44 h-44 rounded-2xl bg-parchment-100/70 border-2 border-parchment-300/50 shadow-inner flex items-center justify-center">
             {question.stem.kind === 'radical' && stemRadical && (
               <GlyphRenderer radical={stemRadical} size={140} strokeWidth={2.6} />
@@ -567,6 +582,12 @@ const QuestionCard: React.FC<{
               <p className="font-song text-xl text-ink-500 px-4 text-center leading-relaxed">{question.stem.text}</p>
             )}
           </div>
+          {/* 同形消歧锚点：用读音锁定题面所指的那一个字/词 */}
+          {question.hint && (
+            <p className="mt-3 px-4 py-1.5 rounded-full bg-vermilion-500/10 border border-vermilion-500/30 text-vermilion-600 font-kai text-sm">
+              {question.hint}
+            </p>
+          )}
         </div>
 
         {/* 选项 */}

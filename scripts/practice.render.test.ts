@@ -9,6 +9,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { PracticePage } from '@/practice/PracticePage';
 import { Header } from '@/components/Header';
+import { GlyphGridPage } from '@/pages/GlyphGridPage';
+import { TimelinePage } from '@/pages/TimelinePage';
+import { RadicalEditorPage } from '@/pages/RadicalEditorPage';
+import { ComposerPage } from '@/pages/ComposerPage';
+import { LexiconPage } from '@/pages/LexiconPage';
 import { usePracticeStore } from '@/practice/store';
 import { useWritingSystemStore } from '@/store/useWritingSystemStore';
 import { nextQuestion } from '@/practice/orchestrator';
@@ -46,6 +51,22 @@ test('页头含练习台导航入口', () => {
   );
   assert.ok(html.includes('练习台'));
   assert.ok(html.includes('/practice'));
+});
+
+test('原有五个页面在路由内照常挂载渲染（不被练习改动影响）', () => {
+  const pages: Array<[string, React.FC]> = [
+    ['字形网格', GlyphGridPage],
+    ['演化时间线', TimelinePage],
+    ['字根编辑', RadicalEditorPage],
+    ['字根组合', ComposerPage],
+    ['词条库', LexiconPage],
+  ];
+  for (const [label, Page] of pages) {
+    const html = renderToStaticMarkup(
+      React.createElement(MemoryRouter, null, React.createElement(Page))
+    );
+    assert.ok(html.length > 500, `${label} 应渲染出内容`);
+  }
 });
 
 test('答过题后再次渲染组件树不抛错（SSR 快照取建店初始态，动态统计由集成测试覆盖）', () => {

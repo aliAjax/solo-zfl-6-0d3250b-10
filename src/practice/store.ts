@@ -11,8 +11,20 @@ export interface SubmitResult extends AnswerOutcome {
   correct: boolean;
 }
 
+/** 下一个全局题号：同时以计数器和历史流水为水位，杜绝新题 id 撞到旧记录 */
+export const nextQuestionSeq = (data: PracticeData): number => {
+  let max = data.questionSeq;
+  for (const h of data.history) {
+    const m = /^q-(\d+)$/.exec(h.questionId);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return max + 1;
+};
+
 interface PracticeStore {
   data: PracticeData;
+  /** 每次导入 / 重置自增：让页面上正在作答、但已属于旧数据集的题目立即失效 */
+  dataEpoch: number;
 
   /** 出一道题并占用一个全局题号（保证题 id 唯一，提交去重可靠） */
   issueQuestion: (
@@ -29,15 +41,18 @@ interface PracticeStore {
   exportPractice: () => string;
   /** 校验失败会 throw Error */
   importPractice: (json: string, now: number) => void;
+  /** 供统一备份服务在校验通过后整体装载（同样自增 epoch） */
+  loadPracticeData: (data: PracticeData) => void;
 }
 
 export const usePracticeStore = create<PracticeStore>()(
   persist(
     (set, get) => ({
       data: createInitialData(Date.now()),
+      dataEpoch: 0,
 
       issueQuestion: (src, targetType, targetId, preferred) => {
-        const seq = get().data.questionSeq + 1;
+        const seq = nextQuestionSeq(get().data);
         const result = buildQuestion({ src, targetType, targetId, seq, preferred });
         if (result.question) {
           set((s) => ({ data: { ...s.data, questionSeq: seq } }));
@@ -67,15 +82,17 @@ export const usePracticeStore = create<PracticeStore>()(
         return { ...outcome, correct: Boolean(first?.correct) };
       },
 
-      resetPractice: () => set({ data: createInitialData(Date.now()) }),
+      resetPractice: () => set((s) => ({ data: createInitialData(Date.now()), dataEpoch: s.dataEpoch + 1 })),
 
       exportPractice: () =>
         JSON.stringify({ ...get().data, exportedAt: new Date().toISOString() }, null, 2),
 
       importPractice: (json, now) => {
         const parsed = JSON.parse(json);
-        set({ data: sanitizePractice(parsed, now) });
+        set((s) => ({ data: sanitizePractice(parsed, now), dataEpoch: s.dataEpoch + 1 }));
       },
+
+      loadPracticeData: (data) => set((s) => ({ data, dataEpoch: s.dataEpoch + 1 })),
     }),
     {
       name: PRACTICE_STORAGE_KEY,
